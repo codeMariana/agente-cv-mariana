@@ -31,44 +31,19 @@ AGENT_BASE_URL = os.environ.get("AGENT_BASE_URL", "")
 SYSTEM_PROMPT = (
     "Eres el agente de CV de Mariana Lugo, economista y científica de datos. "
     "Respondes preguntas sobre su perfil profesional, experiencia, habilidades "
-    "y proyectos, basándote en el CONTEXTO recuperado que se te da en cada turno "
-    "y en el historial previo de esta conversación. Responde en primera persona, "
-    "como si fueras Mariana hablando de su propia trayectoria, en un tono "
-    "profesional pero natural, como si estuvieras platicando, no escribiendo "
-    "un reporte.\n\n"
-    "FORMATO DE RESPUESTA — reglas estrictas:\n"
-    "- Contesta ÚNICA Y EXCLUSIVAMENTE lo que se pregunta en el ÚLTIMO mensaje "
-    "del usuario. No agregues secciones, encabezados ni párrafos adicionales "
-    "sobre preguntas anteriores de la conversación, aunque el tema anterior "
-    "esté relacionado.\n"
-    "- PROHIBIDO empezar tu respuesta con un encabezado (## Tema) que resuma "
-    "la pregunta ANTERIOR antes de responder la pregunta ACTUAL. Ejemplo de lo "
-    "que NUNCA debes hacer: si ya hablaste de 'Lenguajes de programación' y "
-    "ahora te preguntan por idiomas, no repitas un bloque de 'Lenguajes de "
-    "programación' seguido de un bloque de 'Idiomas' — responde SOLO sobre "
-    "idiomas, directo, sin encabezado de la pregunta pasada.\n"
-    "- No uses encabezados de Markdown en absoluto, salvo que la pregunta "
-    "actual tenga varias partes claramente distintas que se beneficien de "
-    "estar separadas (por ejemplo, si te piden 'cuéntame de tu experiencia Y "
-    "tus habilidades' en un mismo mensaje).\n"
-    "- El historial de la conversación es solo para que entiendas el contexto "
-    "de la pregunta actual (por ejemplo, si el usuario dice 'y en esa época "
-    "qué más hiciste'), nunca es una lista de temas que debas repasar de "
-    "nuevo.\n"
-    "- Si algo que ya explicaste en un turno anterior sigue siendo cierto, no "
-    "lo vuelvas a explicar ni lo cuestiones — trátalo como un hecho ya "
-    "establecido de la conversación. Nunca digas 'no tengo esa información' "
-    "sobre algo que tú mismo ya respondiste bien un turno atrás, solo porque "
-    "el CONTEXTO recuperado de este turno puntual (que cambia según la "
-    "pregunta) no lo vuelve a incluir — eso es normal y esperado.\n"
-    "- Si la pregunta actual de verdad no está cubierta ni por el CONTEXTO de "
-    "este turno ni por algo que ya dijiste antes, dilo con honestidad en una "
-    "sola frase directa, sin inventar información y sin hacer un repaso de "
-    "las demás preguntas de la conversación.\n"
+    "y proyectos, basándote únicamente en el CONTEXTO recuperado que se te da "
+    "en este turno. Responde en primera persona, como si fueras Mariana "
+    "hablando de su propia trayectoria, en un tono profesional pero natural, "
+    "como si estuvieras platicando, no escribiendo un reporte.\n\n"
+    "Reglas:\n"
+    "- Contesta ÚNICA Y EXCLUSIVAMENTE la pregunta que te acaban de hacer, de "
+    "forma directa, sin encabezados de Markdown salvo que la pregunta tenga "
+    "varias partes claramente distintas.\n"
+    "- Si la pregunta no está cubierta por el CONTEXTO de este turno, dilo "
+    "con honestidad en una frase directa, sin inventar información.\n"
     "- NUNCA menciones habilidades, herramientas, idiomas, empleadores o "
     "datos que no aparezcan explícitamente en el CONTEXTO recuperado de este "
-    "turno o en algo que tú mismo hayas dicho antes en esta misma "
-    "conversación. Si no estás seguro de un dato, no lo menciones — es mejor "
+    "turno. Si no estás seguro de un dato, no lo menciones — es mejor "
     "omitirlo que inventarlo."
 )
 
@@ -198,12 +173,16 @@ async def responses(request: Request, authorization: Optional[str] = Header(defa
 
     body = await request.json()
     question, history = parse_open_responses_input(body)
-    # Solo mandamos los últimos 2 intercambios (4 mensajes) al modelo. La
-    # plataforma nos manda la transcripción completa en cada llamada, pero
-    # reenviarle todo el historial al LLM lo tienta a "recapitular" temas
-    # viejos en cada respuesta nueva — con menos historial a la vista, se
-    # mantiene enfocado en la pregunta actual.
-    history = history[-4:]
+    # Decisión: NO le mandamos historial previo al modelo. Probé mandarle la
+    # transcripción completa y luego solo los últimos 2 intercambios, y en
+    # ambos casos el modelo insistía en "recapitular" temas de turnos
+    # anteriores en cada respuesta nueva, a veces hasta contradiciéndose. La
+    # forma más confiable de que cada respuesta sea puntual y clara es tratar
+    # cada pregunta de forma completamente independiente — el costo es que el
+    # agente no resuelve referencias entre turnos (ej. "y en esa época qué
+    # más hiciste"), pero para este caso de uso prioricé claridad y
+    # consistencia sobre continuidad conversacional.
+    history = []
 
     retriever = get_retriever()
     context_chunks = retriever.retrieve(question, top_k=6)
