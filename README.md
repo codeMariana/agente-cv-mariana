@@ -72,16 +72,24 @@ También expongo una tarjeta de agente en `/.well-known/agent-card.json`, siguie
 
 Y dejé la protección por API key como opcional, sin activarla por ahora, para simplificar el registro en la plataforma del reto. Lo pienso como una decisión consciente, no un descuido: en un entorno real la activaría de inmediato, porque sin ella cualquiera con la URL puede pegarle al endpoint y consumir mi crédito de la API.
 
-## Cosas que no salieron a la primera
+## Retos del agente y lecciones aprendidas
 
-Vale la pena contarlas porque también son parte de operar un agente, no solo de construirlo.
+Operar un agente también implica resolver problemas que aparecen durante el desarrollo y, sobre todo, en producción.
 
-Mi máquina tenía una versión de Python demasiado vieja para las librerías que estaba usando (FastAPI, Pydantic), así que tuve que instalar una versión más nueva con pyenv, en paralelo al Python del sistema, para no romper nada más en la máquina.
+- **Compatibilidad de Python:** La versión disponible no era compatible con FastAPI y Pydantic. Lo resolví instalando una versión nueva con `pyenv` y adaptando el código para mantener compatibilidad.
 
-El código original usaba una sintaxis de tipos de Python 3.10+ (`str | None`), que Pydantic evalúa en tiempo real al validar las solicitudes. Tuve que reescribirlo con `typing.Optional` para que funcionara en versiones más viejas — un recordatorio de que no todo el mundo va a correr esto con el Python más reciente.
+- **Render:** El plan gratuito duerme el servicio después de 15 minutos sin tráfico. Para este volumen de uso, opté por mantenerlo activo mediante un monitor externo en lugar de contratar un plan de pago.
 
-Elegí Render para el despliegue porque solo necesitaba un Dockerfile simple y build automático desde GitHub, sin configurar nada extra. El costo de eso es que el plan gratuito duerme el servicio después de 15 minutos sin tráfico. En vez de pagar por un plan que nunca duerma —que para el tráfico que espera este reto no se justifica—, configuré un monitor gratuito que lo mantiene despierto con pings periódicos.
+- **Recuperación de información:** En producción, TF-IDF confundía términos similares como *"experiencia profesional"* y *"dominio profesional"*, recuperando información incorrecta. Lo solucioné incorporando **bigramas** al vectorizador.
 
-Y ya en producción, probando con preguntas reales, me topé con un problema clásico de TF-IDF: al preguntar "cuéntame de tu experiencia profesional", el retriever confundía la palabra "profesional" con la que aparece en "Inglés (dominio profesional)" dentro de Idiomas, y esa sección se colaba en el contexto en vez de mis roles reales. Lo resolví de dos formas: usando bigramas en el vectorizador (para que "experiencia profesional" compita como frase, no como palabras sueltas) y subiendo de 4 a 6 los chunks recuperados por pregunta, además de quitar una sección de perfil que estaba duplicada entre dos archivos y le robaba espacio a contenido más específico.
+- **Historial conversacional:**
 
-El tropiezo que más tiempo me tomó fue con el manejo del historial de conversación. Al principio le mandaba al modelo toda la transcripción previa en cada llamada —parecía lo correcto, es lo que uno esperaría de un chat normal—, pero en la práctica el modelo empezó a "recapitular" temas de preguntas anteriores en cada respuesta nueva. Le preguntaba por sus idiomas y me contestaba bien sobre idiomas, pero le agregaba de regalo un párrafo sobre lenguajes de programación (el tema de la pregunta anterior), y a veces hasta se contradecía diciendo que no tenía información sobre algo que él mismo acababa de explicar dos mensajes atrás. Probé acotar el historial a los últimos dos intercambios y cambiar a un modelo más grande, pensando que era un tema de seguir instrucciones —ayudó un poco, pero el problema no desapareció del todo, y en un intento el modelo llegó incluso a inventar herramientas que no uso (dijo que sé VBA, que no aparece en ningún lado de mi CV). Al final la decisión que sí funcionó de raíz fue la más simple: dejar de mandarle historial al modelo por completo. Cada pregunta se procesa de forma totalmente independiente, sin ver los turnos anteriores de la conversación. El costo es que el agente no puede resolver preguntas que dependan de contexto previo (si preguntas "¿y en esa época qué más hiciste?" sin decir a qué época te refieres, no va a saber de qué hablas). Para un agente de CV, donde casi todas las preguntas son autocontenidas, me pareció un costo razonable a cambio de que cada respuesta sea consistente y no se contradiga a sí misma — prioricé confiabilidad sobre continuidad conversacional.
+El reto más importante fue el manejo del historial. Inicialmente enviaba la conversación completa al modelo, lo que provocaba que:
+
+- recapitulase preguntas anteriores;
+- se contradijera con respuestas previas;
+- e incluso mencionara herramientas que el agente no utilizaba.
+
+Probé reducir el historial y utilizar un modelo más grande, pero la solución más estable fue **procesar cada pregunta de forma independiente**.
+
+Esto implica perder cierta capacidad para responder preguntas de seguimiento que dependan del contexto, pero para un agente de CV prioricé **consistencia y precisión sobre continuidad conversacional**, ya que la mayoría de las preguntas son autocontenidas.
