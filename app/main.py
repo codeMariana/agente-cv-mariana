@@ -23,7 +23,7 @@ from .rag import get_retriever
 app = FastAPI(title="Agente de CV — Mariana Lugo")
 
 AGENT_API_KEY = os.environ.get("AGENT_API_KEY")  # opcional, para proteger el endpoint
-MODEL_NAME = os.environ.get("MODEL_NAME", "claude-haiku-4-5-20251001")
+MODEL_NAME = os.environ.get("MODEL_NAME", "claude-sonnet-5")
 # URL pública completa donde queda desplegado el agente, ej. https://tu-agente.onrender.com
 # Se usa solo para construir la Agent Card (/.well-known/agent-card.json).
 AGENT_BASE_URL = os.environ.get("AGENT_BASE_URL", "")
@@ -64,7 +64,12 @@ SYSTEM_PROMPT = (
     "- Si la pregunta actual de verdad no está cubierta ni por el CONTEXTO de "
     "este turno ni por algo que ya dijiste antes, dilo con honestidad en una "
     "sola frase directa, sin inventar información y sin hacer un repaso de "
-    "las demás preguntas de la conversación."
+    "las demás preguntas de la conversación.\n"
+    "- NUNCA menciones habilidades, herramientas, idiomas, empleadores o "
+    "datos que no aparezcan explícitamente en el CONTEXTO recuperado de este "
+    "turno o en algo que tú mismo hayas dicho antes en esta misma "
+    "conversación. Si no estás seguro de un dato, no lo menciones — es mejor "
+    "omitirlo que inventarlo."
 )
 
 
@@ -193,6 +198,12 @@ async def responses(request: Request, authorization: Optional[str] = Header(defa
 
     body = await request.json()
     question, history = parse_open_responses_input(body)
+    # Solo mandamos los últimos 2 intercambios (4 mensajes) al modelo. La
+    # plataforma nos manda la transcripción completa en cada llamada, pero
+    # reenviarle todo el historial al LLM lo tienta a "recapitular" temas
+    # viejos en cada respuesta nueva — con menos historial a la vista, se
+    # mantiene enfocado en la pregunta actual.
+    history = history[-4:]
 
     retriever = get_retriever()
     context_chunks = retriever.retrieve(question, top_k=6)
