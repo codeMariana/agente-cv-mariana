@@ -22,7 +22,11 @@ class Retriever:
         self.chunks = []  # type: List[str]
         self.sources = []  # type: List[str]
         self._load(data_dir)
-        self.vectorizer = TfidfVectorizer(stop_words=None)
+        self.vectorizer = TfidfVectorizer(
+            stop_words=None,
+            ngram_range=(1, 2),
+            sublinear_tf=True,
+        )
         self.matrix = self.vectorizer.fit_transform(self.chunks)
 
     def _load(self, data_dir):
@@ -40,7 +44,7 @@ class Retriever:
                     self.chunks.append(section)
                     self.sources.append(os.path.basename(path))
 
-    def retrieve(self, query, top_k=4):
+    def retrieve(self, query, top_k=6):
         query_vec = self.vectorizer.transform([query])
         sims = cosine_similarity(query_vec, self.matrix).flatten()
         top_idx = sims.argsort()[::-1][:top_k]
