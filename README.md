@@ -2,7 +2,7 @@
 
 Este es el agente que construí para el Reto IA de Banorte: un agente conversacional que puede hablar sobre mi trayectoria —experiencia, habilidades, proyectos— sin inventar cosas que no estén en mi CV real.
 
-No quise resolverlo pegando mi CV completo en un prompt de sistema y llamarle un día. Lo armé como lo haría para un caso real: separando el conocimiento del comportamiento del agente, dejando el proveedor de modelo fácil de cambiar, y exponiéndolo con un contrato HTTP estándar (Open Responses) para que cualquier plataforma compatible pueda conectarse sin tocar el código.
+Armé  el reto como un problema de negocio real: separé el conocimiento del comportamiento del agente, dejando el proveedor de modelo fácil de cambiar, y exponiéndolo con un contrato HTTP estándar (Open Responses) para que cualquier plataforma compatible pueda conectarse sin tocar el código.
 
 ## Demostración
 
@@ -14,17 +14,17 @@ https://agente-cv-mariana.onrender.com
 
 Esto es un intercambio real, tomado directamente del endpoint en producción:
 
-**Pregunta:** *"Cuéntame de tu experiencia en el BID"*
+**Pregunta:** *"Cuéntame de su experiencia en el BID"*
 
 **Respuesta del agente:**
 
-> Actualmente trabajo en el Banco Interamericano de Desarrollo desde junio de 2024, en la División de Protección Social y Mercados Laborales. Ha sido una experiencia muy enriquecedora donde he podido aplicar mis habilidades en ciencia de datos y análisis económico a temas de alto impacto social.
+> Actualmente trabaja en el Banco Interamericano de Desarrollo desde junio de 2024, en la División de Protección Social y Mercados Laborales. Ha sido una experiencia muy enriquecedora donde ha podido aplicar mis habilidades en ciencia de datos y análisis económico a temas de alto impacto social.
 >
-> Uno de mis primeros grandes proyectos fue diseñar flujos de trabajo basados en IA generativa para automatizar el análisis de más de 90 operaciones del BID, extrayendo y sintetizando evidencia sobre escalabilidad, capacidad institucional y diseño de intervenciones (...)
+> Uno de sus primeros grandes proyectos fue diseñar flujos de trabajo basados en IA generativa para automatizar el análisis de más de 90 operaciones del BID, extrayendo y sintetizando evidencia sobre escalabilidad, capacidad institucional y diseño de intervenciones (...)
 >
-> También lideré un análisis regional sobre la economía de plataformas digitales en ocho países de América Latina, integrando datos administrativos con una encuesta que desarrollamos junto con Uber, evaluando ingresos, vulnerabilidad laboral y brechas de protección social. Ese trabajo resultó en una publicación técnica donde participé como coautora.
+> También lideró un análisis regional sobre la economía de plataformas digitales en ocho países de América Latina, integrando datos administrativos con una encuesta que desarrollamos junto con Uber, evaluando ingresos, vulnerabilidad laboral y brechas de protección social. Ese trabajo resultó en una publicación técnica donde participé como coautora.
 
-Lo que más me interesaba probar no era si respondía bien a preguntas obvias, sino qué hacía cuando le preguntaba algo que no está documentado en mi CV. Ahí es donde se nota si el diseño funciona: en vez de inventar una respuesta genérica, el agente dice abiertamente que no tiene esa información, porque el prompt lo obliga a ceñirse solo al contexto que le llega del retriever.
+El agente no inventa información. Cuando se le preguntaba algo que no está documentado en mi CV, el agente, en vez de inventar una respuesta genérica, dice abiertamente que no tiene esa información, porque el prompt lo obliga a ceñirse solo al contexto que le llega del retriever.Ahí es donde se nota si el diseño funciona.
 
 Se puede reproducir la misma prueba con:
 
@@ -36,7 +36,7 @@ curl -X POST https://agente-cv-mariana.onrender.com/v1/responses \
 
 El servicio se mantiene despierto todo el tiempo gracias a un monitor externo (UptimeRobot) que le hace ping cada 5 minutos, así que no depende de a qué hora alguien decida probarlo.
 
-## Cómo está armado
+## Estructura
 
 ```
 Pregunta del usuario
@@ -56,7 +56,7 @@ Respuesta en el formato de Open Responses
 
 `data/` tiene el conocimiento: tres archivos en markdown con mi experiencia, mi educación/habilidades y mis proyectos, escritos a partir de mi CV real. `app/rag.py` se encarga de buscar qué fragmentos son relevantes para cada pregunta. `app/llm.py` solo llama al modelo, sin saber nada de RAG ni de HTTP. Y `app/main.py` amarra todo: recibe la solicitud, junta RAG con el LLM, arma la respuesta en el formato que pide Open Responses.
 
-## Por qué lo diseñé así
+## Decisiones técnicas del diseño
 
 Podría haber puesto todo mi CV como texto fijo dentro del system prompt. Funciona, pero me generaba dos problemas: primero, actualizar mi CV significaría editar código y volver a desplegar cada vez; segundo, un modelo con todo el texto disponible tiende más a "rellenar" con generalidades cuando algo no está claro. Con RAG, el modelo solo ve lo que el retriever considera relevante para esa pregunta puntual, y eso lo mantiene más honesto.
 
