@@ -56,7 +56,7 @@ Respuesta en el formato de Open Responses
 
 `data/` tiene el conocimiento: tres archivos en markdown con mi experiencia, mi educación/habilidades y mis proyectos, escritos a partir de mi CV real. `app/rag.py` se encarga de buscar qué fragmentos son relevantes para cada pregunta. `app/llm.py` solo llama al modelo, sin saber nada de RAG ni de HTTP. Y `app/main.py` amarra todo: recibe la solicitud, junta RAG con el LLM, arma la respuesta en el formato que pide Open Responses.
 
-## Demo de las decisiones técnicas
+## Decisiones técnicas
 
 Podría haber puesto todo mi CV como texto fijo dentro del system prompt. Funciona, pero me generaba dos problemas: primero, actualizar mi CV significaría editar código y volver a desplegar cada vez; segundo, un modelo con todo el texto disponible tiende más a "rellenar" con generalidades cuando algo no está claro. Con RAG, el modelo solo ve lo que el retriever considera relevante para esa pregunta puntual, y eso lo mantiene más honesto.
 
