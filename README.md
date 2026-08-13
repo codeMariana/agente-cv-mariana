@@ -58,19 +58,19 @@ Respuesta en el formato de Open Responses
 
 ## Decisiones técnicas del diseño
 
-Podría haber puesto todo mi CV como texto fijo dentro del system prompt. Funciona, pero me generaba dos problemas: primero, actualizar mi CV significaría editar código y volver a desplegar cada vez; segundo, un modelo con todo el texto disponible tiende más a "rellenar" con generalidades cuando algo no está claro. Con RAG, el modelo solo ve lo que el retriever considera relevante para esa pregunta puntual, y eso lo mantiene más honesto.
+- **RAG vs. CV en el prompt:** En lugar de incluir todo el CV en el `system prompt`, opté por **RAG**. Esto facilita actualizar el contenido sin modificar código y reduce respuestas genéricas o información inventada.
 
-Para la recuperación pensé en usar embeddings con un vector store (Chroma, FAISS), que es lo que normalmente se recomienda para RAG. Pero mi corpus son tres documentos. Meter un servicio de embeddings ahí es agregar una dependencia externa, latencia de red y costo, por un beneficio que no vas a notar con un corpus tan chico. Terminé usando TF-IDF con similitud coseno, corriendo en memoria con scikit-learn — resuelve exactamente el mismo problema, en milisegundos, sin llamar a nada afuera. Si algún día mi CV creciera a decenas de documentos, `app/rag.py` es el único archivo que tocaría para migrar a algo más sofisticado.
+- **TF-IDF vs. embeddings:** Aunque un RAG tradicional usaría embeddings + vector store (Chroma/FAISS), el corpus son solo **tres documentos**. Para este volumen, `TF-IDF + similitud coseno` con `scikit-learn` ofrece menor complejidad, sin dependencias externas y con tiempos de respuesta de milisegundos.
 
-Una decisión más chica pero que sí se nota: en vez de partir el texto cada N caracteres (lo más común), parto cada documento por sus encabezados. Así cada chunk es una unidad completa —un puesto, un proyecto— en vez de un pedazo de idea cortado a la mitad. Lo probé de las dos formas al principio y la diferencia en la calidad de las respuestas fue bastante notoria.
+- **Chunking por estructura:** En lugar de dividir los documentos cada N caracteres, los separo por **encabezados**. Así cada chunk representa una unidad completa, como un puesto, proyecto o sección del CV, mejorando la calidad de la recuperación.
 
-El endpoint no guarda ningún estado del lado del servidor: no hay base de datos de sesiones ni memoria que expire, así que puedo tener varias instancias corriendo sin que se pisen entre ellas. La plataforma me manda la transcripción completa de la conversación en cada llamada (el modo "reproducir transcripción"), pero —como cuento más abajo— terminé decidiendo no usar ese historial para generar la respuesta.
+- **Arquitectura stateless:** El endpoint no mantiene sesiones ni estado en servidor. Esto permite escalar a múltiples instancias sin problemas de sincronización.
 
-Durante el desarrollo cambié de proveedor de LLM dos veces —empecé con Anthropic, probé OpenAI cuando tuve problemas de crédito, y terminé regresando a Anthropic. El hecho de que ese cambio solo haya tocado un archivo (`app/llm.py`) y nada más del sistema confirma que valió la pena aislarlo desde el inicio; no sabía de antemano si iba a necesitar cambiar de proveedor por costo o disponibilidad, y resultó que sí.
+- **Proveedor de LLM desacoplado:** Aislé la integración con el modelo en `app/llm.py`. Durante el desarrollo cambié de proveedor dos veces sin modificar el resto de la arquitectura, demostrando la utilidad de mantener esta dependencia desacoplada.
 
-También expongo una tarjeta de agente en `/.well-known/agent-card.json`, siguiendo el formato A2A, con mis metadatos y la URL de Open Responses. La idea es que una plataforma compatible pueda autocompletar el registro con solo mi dominio, en vez de que alguien tenga que llenar el formulario campo por campo a mano.
+- **Compatibilidad con A2A:** Expongo `/.well-known/agent-card.json` siguiendo el formato **A2A**, permitiendo que plataformas compatibles descubran automáticamente los metadatos y endpoint del agente.
 
-Y dejé la protección por API key como opcional, sin activarla por ahora, para simplificar el registro en la plataforma del reto. Lo pienso como una decisión consciente, no un descuido: en un entorno real la activaría de inmediato, porque sin ella cualquiera con la URL puede pegarle al endpoint y consumir mi crédito de la API.
+- **API Key opcional:** La protección mediante API key está implementada pero desactivada para facilitar el registro en la plataforma del reto. En un entorno productivo se activaría para evitar uso no autorizado y consumo de créditos.
 
 ## Retos del agente y lecciones aprendidas
 
